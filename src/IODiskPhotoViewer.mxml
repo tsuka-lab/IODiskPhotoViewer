@@ -1,0 +1,419 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:WindowedApplication xmlns:mx="http://www.adobe.com/2006/mxml"
+	layout="absolute"
+	width="600"
+	height="600"
+	backgroundColor="#000000"
+	applicationComplete="onApplicationComplete()"
+	frameRate="60"
+	showStatusBar="false"
+	verticalScrollPolicy="off"
+	horizontalScrollPolicy="off"
+	xmlns:view="iodisk.view.*"
+	mouseMove="onMouseMove()"
+	>
+	<mx:Script>
+		<![CDATA[
+			import flash.filesystem.File;
+			import iodisk.view.PhotoCircleEvent;
+			import mx.utils.StringUtil;
+			private var server:Socket;
+			private var sharedObj:SharedObject;
+			private var maxLogLength:int = 1000;
+			
+			private function onApplicationComplete():void {
+				sharedObj = SharedObject.getLocal("iodisk-photo-viewer");
+				if (sharedObj.data.directoryPath) {
+					var dir:File = new File(sharedObj.data.directoryPath);
+					if (dir.exists && dir.isDirectory) {
+						dirPathLabel.text = dir.nativePath;
+						loadPhotosButton.enabled = true;
+					}
+				}
+				if (sharedObj.data.host) {
+					hostTextInput.text = sharedObj.data.host;
+				}
+				if (sharedObj.data.port) {
+					portTextInput.text = sharedObj.data.port;
+				}
+				if (sharedObj.data.maxLogLength) {
+					maxLogLength = sharedObj.data.maxLogLength;
+				}
+				//maxLogLengthTextInput.text = maxLogLength.toString();
+				
+				photoCircle.addEventListener(PhotoCircleEvent.NextAlbum, onAlbumNext);
+				photoCircle.addEventListener(PhotoCircleEvent.PrevAlbum, onAlbumPrev);
+				stage.addEventListener(KeyboardEvent.KEY_UP, onKeyboardEvent);
+				
+				mouseMoveTimeoutId = setTimeout(onMouseStop, 5000);
+			}
+			
+			private function onKeyboardEvent(keyEvent:KeyboardEvent):void {
+				switch (keyEvent.keyCode) {
+					case Keyboard.ENTER:
+						onConnectButtonClick();
+						break;
+					case Keyboard.N:
+						onCommand("next");
+						break;
+					case Keyboard.P:
+						onCommand("previous");
+						break;
+					
+					case Keyboard.F:
+						onCommand("forward");
+						break;
+					case Keyboard.R:
+						onCommand("reverse");
+						break;
+					
+					case Keyboard.S:
+						onCommand("stop");
+						break;
+					case Keyboard.SPACE:
+						onCommand("pause");
+						break;
+						
+					case Keyboard.NUMBER_1:
+						keyEvent.shiftKey
+							? onCommand("fr1")
+							: onCommand("ff1");
+						break;
+					case Keyboard.NUMBER_2:
+						keyEvent.shiftKey
+							? onCommand("fr2")
+							: onCommand("ff2");
+						break;
+					case Keyboard.W:
+						onCommand("fr2");
+						break;
+					case Keyboard.NUMBER_3:
+						keyEvent.shiftKey
+							? onCommand("fr3")
+							: onCommand("ff3");
+						break;
+					case Keyboard.NUMBER_4:
+						keyEvent.shiftKey
+							? onCommand("fr4")
+							: onCommand("ff4");
+						break;
+					
+				}
+			}
+			
+			//
+			// Socket
+			//
+			private function onConnectButtonClick():void {
+				if (server && server.connected) {
+					Log.debug("close");
+					server.close();
+					setButtonsConnectable();
+					return;
+				}
+				connectButton.enabled = false;
+				
+				//maxLogLengthTextInput.enabled = false;
+				hostTextInput.enabled = false;
+				portTextInput.enabled = false;
+				
+				var host:String = hostTextInput.text;
+				var port:int = parseInt(portTextInput.text);
+				// update and save maxLogLength
+				/***
+				var i:int = parseInt(maxLogLengthTextInput.text);
+				if (!isNaN(i) && i > 0) {
+					maxLogLength = i;
+					sharedObj.data.maxLogLength = i;
+				}
+				***/
+				// connect to server
+				server = new Socket();
+				server.addEventListener(ProgressEvent.SOCKET_DATA, onSocketData);
+				server.addEventListener(Event.CONNECT, function():void{
+					//log("socket: connected");
+					connectButton.label = "Disconnect";
+					connectButton.enabled = true;
+					Log.debug("socket: connected");
+				});
+				server.addEventListener(Event.CLOSE, onSocketError);
+				server.addEventListener(IOErrorEvent.IO_ERROR, onSocketError);
+				server.addEventListener(SecurityErrorEvent.SECURITY_ERROR, onSocketError);
+				Log.debug("socket: connecting...");
+				server.connect(host, port);
+				
+				// save host and port
+				sharedObj.data.host = host;
+				sharedObj.data.port = port;
+			}
+			
+			private function onSocketError(event:Event):void {
+				Log.debug("socket: "+event.type);
+				setButtonsConnectable();
+			}
+			
+			private function setButtonsConnectable():void {
+				connectButton.label = "Connect";
+				connectButton.enabled = true;
+				hostTextInput.enabled = true;
+				portTextInput.enabled = true;
+			}
+			
+			private function onSocketData(event:ProgressEvent):void {
+				var data:String = Socket(event.target).readUTFBytes(event.bytesLoaded);
+				for each (var str:String in data.split(/\r\n|\n|\r/)) {
+					if (str.length > 0) {
+						var n:Number = parseInt(str);
+						if (isNaN(n)) {
+							var cmd:String = StringUtil.trim(str);
+							Log.debug("[Command] " + cmd);
+							onCommand(cmd);
+						} else {
+							//log("[Number] " + str);
+							//drawRotary(convDegreeToRadian(n));
+						}
+					}
+				}
+			}
+			
+			private function onCommand(cmd:String):void {
+				switch(cmd) {
+					case "forward":
+						speedIndicator.forward1();
+						photoCircle.zoom = 1;
+						photoCircle.speed = 1;
+						break;
+					case "next":
+						speedIndicator.clear();
+						photoCircle.rotateToNextAlbum();
+						break;
+					case "previous":
+						speedIndicator.clear();
+						photoCircle.rotateToPrevAlbum();
+						break;
+					case "pause":
+						if (!photoCircle.jumping) speedIndicator.pause();
+						photoCircle.speed = 0;
+						break;
+					case "stop":
+						if (!photoCircle.jumping) speedIndicator.stop();
+						photoCircle.zoom = 1;
+						photoCircle.speed = 0;
+						break;
+					
+					case "ff1":
+						if (!photoCircle.jumping) speedIndicator.forward2();
+						photoCircle.zoom = 0.65;
+						photoCircle.speed = 8;
+						break;
+					case "ff2":
+						if (!photoCircle.jumping) speedIndicator.forward3();
+						photoCircle.zoom = 0.4;
+						photoCircle.speed = 14;
+						break;
+					case "ff3":
+						if (!photoCircle.jumping) speedIndicator.forward4();
+						photoCircle.zoom = 0.2;
+						photoCircle.speed = 19;
+						break;
+					case "ff4":
+						if (!photoCircle.jumping) speedIndicator.forward4();
+						photoCircle.zoom = 0.05;
+						photoCircle.speed = 20;
+						break;
+					
+					case "reverse":
+						if (!photoCircle.jumping) speedIndicator.reverse1();
+						photoCircle.zoom = 1;
+						photoCircle.speed = -1;
+						break;
+					case "fr1":
+						if (!photoCircle.jumping) speedIndicator.reverse2();
+						photoCircle.zoom = 0.65;
+						photoCircle.speed = -8;
+						break;
+					case "fr2":
+						if (!photoCircle.jumping) speedIndicator.reverse3();
+						photoCircle.zoom = 0.4;
+						photoCircle.speed = -14;
+						break;
+					case "fr3":
+						if (!photoCircle.jumping) speedIndicator.reverse4();
+						photoCircle.zoom = 0.2;
+						photoCircle.speed = -19;
+						break;
+					case "fr4":
+						if (!photoCircle.jumping) speedIndicator.reverse4();
+						photoCircle.zoom = 0.1;
+						photoCircle.speed = -20;
+						break;
+				}
+			}
+			
+			//
+			// Photos
+			//
+			private function onSelectDirectoryButtonClick():void {
+				var dir:File = File.desktopDirectory;
+				dir.addEventListener(Event.SELECT, onDirectorySelect, false, 0, true);
+				dir.browseForDirectory("Please select a directory");
+			}
+			
+			private function onDirectorySelect(event:Event):void {
+				var dir:File = event.target as File;
+				if (dir) {
+					dirPathLabel.text = dir.nativePath;
+					loadPhotosButton.enabled = true;
+					sharedObj.data.directoryPath = dir.nativePath;
+				} else {
+					loadPhotosButton.enabled = false;
+				}
+			}
+			
+			private function onLoadDirectoryButtonClick():void {
+				var dir:File = new File(dirPathLabel.text);
+				if (!dir.exists) {
+					Log.debug("no such directory: " + dir.nativePath);
+					return;
+				}
+				selectPhotosDirButton.enabled = false;
+				loadPhotosButton.enabled = false;
+				photoCircle.load(dir);
+			}
+			
+			private function onAlbumNext(event:PhotoCircleEvent):void {
+				albumTitle.switchToNextAlbum(event.albumName);
+			}
+			private function onAlbumPrev(event:PhotoCircleEvent):void {
+				albumTitle.switchToPrevAlbum(event.albumName);
+			}
+			
+			//
+			// Mouse
+			//
+			private var mouseMoveTimeoutId:int;
+			private function onMouseMove():void {
+				//playlistPanel.visible = true;
+				connectPanel.visible = true;
+				clearTimeout(mouseMoveTimeoutId);
+				mouseMoveTimeoutId = setTimeout(onMouseStop, 3000);
+			}
+			private function onMouseStop():void {
+				connectPanel.visible = false;
+			}
+		]]>
+	</mx:Script>
+	
+	<mx:Style>
+		TextInput
+		{
+			font-size: 11;
+			vertical-align: middle;
+		}
+
+		CheckBox,
+		Label
+		{
+			font-weight: bold;
+			font-size: 13;
+			vertical-align: middle;
+		}
+		
+		.panel
+		{
+			background-color: #CCCCCC;
+			background-alpha: 0.9;
+			border-color: #EEEEEE;
+			border-style: solid;
+			padding-left: 8;
+			padding-right: 8;
+			padding-top: 8;
+			padding-bottom: 8;
+			corner-radius: 5;
+			drop-shadow-enabled: true;
+		}
+	</mx:Style>
+	
+	<mx:Fade id="fadeOut" duration="700" alphaFrom="0.9" alphaTo="0" />
+	<mx:Fade id="fadeIn"  duration="500" alphaFrom="0" alphaTo="0.9" />
+	
+	<view:PhotoCircle
+		id="photoCircle"
+		x="0"
+		y="0"
+		/>
+	<view:AlbumTitle
+		id="albumTitle"
+		left="0"
+		right="0"
+		/>
+	<view:SpeedIndicator
+		id="speedIndicator"
+		right="50"
+		top="25"
+		width="1"
+		height="1"
+		/>
+		
+	<mx:VBox
+		id="connectPanel"
+		styleName="panel"
+		bottom="8"
+		left="8"
+		right="8"
+		showEffect="{fadeIn}"
+		hideEffect="{fadeOut}"
+		>
+		
+		<mx:HBox>
+			<mx:Label text="Host" />
+			<mx:TextInput
+				id="hostTextInput"
+				text="localhost"
+				width="140" />
+			<mx:Label text="Port" />
+			<mx:TextInput
+				id="portTextInput"
+				text="4323"
+				restrict="0-9"
+				width="60" />
+			<mx:Button
+				id="connectButton"
+				label="Connect"
+				click="onConnectButtonClick()" />
+			<mx:CheckBox
+				id="showLogCheckBox"
+				label="Log"
+				selected="false"
+				/>
+		</mx:HBox>
+		<mx:Label
+			id="dirPathLabel"
+			text="Please select a directory which contains directories each of which contain photos."
+			fontWeight="normal"
+			/>
+		<mx:HBox>
+			<mx:Button
+				id="selectPhotosDirButton"
+				label="Choose Directory"
+				click="onSelectDirectoryButtonClick()"
+				/>
+			<mx:Button
+				id="loadPhotosButton"
+				label="Load Photos"
+				click="onLoadDirectoryButtonClick()"
+				enabled="false"
+				/>
+		</mx:HBox>
+	</mx:VBox>
+
+	<view:Log id="logPanel"
+		top="8"
+		right="8"
+		alpha="0.9"
+		dropShadowEnabled="true"
+		visible="{showLogCheckBox.selected}"
+		showEffect="{fadeIn}"
+		hideEffect="{fadeOut}"
+		/>
+</mx:WindowedApplication>

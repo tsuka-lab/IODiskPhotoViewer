@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml"
+	width="5" height="5"
+	>
+	<mx:Script>
+		<![CDATA[
+			private var iconFillColor:int = 0x33FF33;
+			private var iconBorderColor:int = 0x000000;
+			private var iconBorderWidth:Number = 1.5;
+			
+			// <<<< <<< << || > >> >>> >>>>
+			public function clear():void {
+				this.graphics.clear();
+			}
+			
+			public function pause():void {
+				redrawPause();
+			}
+			
+			public function stop():void {
+				redrawStop();
+			}
+			
+			//
+			// forward & fast forward
+			//
+			public function forward1():void {
+				redrawRightTriangles(1);
+			}
+			
+			public function forward2():void {
+				redrawRightTriangles(2);
+			}
+			
+			public function forward3():void {
+				redrawRightTriangles(3);
+			}
+			
+			public function forward4():void {
+				redrawRightTriangles(4);
+			}
+			
+			/**
+			 * @param value 0 ~ 1
+			 */
+			public function fastForward(value:Number):void {
+				if (value > 3/4) {
+					forward4();
+				} else if (value > 2/4) {
+					forward3();
+				} else if (value > 1/4) {
+					forward2();
+				} else {
+					forward1();
+				}
+			}
+			
+			private function redrawRightTriangles(n:uint):void {
+				this.graphics.clear();
+				var w:int = 18;
+				var h:int = 30;
+				var left:int = -(n * w) / 2;
+				
+				for (var i:int=0; i<n; i++) {
+					drawRightTriangle(left+i*w, -h/2, w, h);
+				}
+			}
+			
+			private function drawRightTriangle(x:int, y:int, w:int, h:int):void {
+				with (this.graphics) {
+					lineStyle(iconBorderWidth, iconBorderColor);
+					beginFill(iconFillColor, 1);
+					moveTo(x, y);
+					lineTo(x + w, y + h/2);
+					lineTo(x, y + h);
+					lineTo(x, y);
+					endFill();
+				}
+			}
+			
+			//
+			// reverse
+			//
+			public function reverse1():void {
+				redrawLeftTriangles(1);
+			}
+			
+			public function reverse2():void {
+				redrawLeftTriangles(2);
+			}
+			
+			public function reverse3():void {
+				redrawLeftTriangles(3);
+			}
+			
+			public function reverse4():void {
+				redrawLeftTriangles(4);
+			}
+			
+			/**
+			 * @param value 0 ~ 1
+			 */
+			public function reverse(value:Number):void {
+				if (value > 3/4) {
+					reverse4();
+				} else if (value > 2/4) {
+					reverse3();
+				} else if (value > 1/4) {
+					reverse2();
+				} else {
+					reverse1();
+				}
+			}
+			
+			private function redrawLeftTriangles(n:uint):void {
+				this.graphics.clear();
+				var w:int = 18;
+				var h:int = 30;
+				var left:int = -(n * w) / 2;
+				for (var i:int=0; i<n; i++) {
+					drawLeftTriangle(left+i*w, -h/2, w, h);
+				}
+			}
+			
+			private function drawLeftTriangle(x:int, y:int, w:int, h:int):void {
+				drawRightTriangle(x+w, y, -w, h);
+			}
+			
+			private function redrawPause():void {
+				var barW:int = 8;
+				var barH:int = 20;
+				var margin:int = 4;
+				var top:int = -barH/2;
+				var left:int = -(barW*2 + margin)/2;
+				
+				with (this.graphics) {
+					clear();
+					lineStyle(iconBorderWidth, iconBorderColor);
+					beginFill(iconFillColor, 1);
+					drawRect(
+						left, top,
+						barW, barH);
+					endFill();
+					beginFill(iconFillColor, 1);
+					drawRect(
+						left + barW + margin, top,
+						barW, barH);
+					endFill();
+				}
+			}
+			
+			private function redrawStop():void {
+				var w:int = 18;
+				var h:int = 20;
+				with (this.graphics) {
+					clear();
+					lineStyle(iconBorderWidth, iconBorderColor);
+					beginFill(iconFillColor, 1);
+					drawRect(-w/2, -h/2, w, h);
+					endFill();
+				}
+			}
+		]]>
+	</mx:Script>
+</mx:Canvas>

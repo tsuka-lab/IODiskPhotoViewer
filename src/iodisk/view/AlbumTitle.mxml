@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml" width="400" height="200"
+	horizontalScrollPolicy="off"
+	verticalScrollPolicy="off"
+	creationComplete="onCreationComplete()"
+	>
+	<mx:Script>
+		<![CDATA[
+			import flash.utils.setTimeout;
+			import caurina.transitions.Tweener;
+			import mx.controls.Label;
+			import mx.controls.Text;
+			
+			public var currentLabel:Label = null;
+			
+			private function onCreationComplete():void {
+				addEventListener(Event.ADDED_TO_STAGE, function():void {
+					stage.addEventListener(Event.RESIZE, onResize);
+				});
+			}
+			
+			private function onResize(event:Event):void {
+				if (currentLabel) {
+					currentLabel.x = (width - currentLabel.width)/2;
+				}
+			}
+			
+			
+			public function switchToNextAlbum(name:String):void {
+				_switch(name, true);
+			}
+			
+			public function switchToPrevAlbum(name:String):void {
+				_switch(name, false);
+			}
+			
+			private function _switch(name:String, toLeft:Boolean=true):void {
+				var self:AlbumTitle = this;
+				var label:Label = createLabel(name);
+				var prevLabel:Label = currentLabel;
+				currentLabel = label;
+				
+				if (prevLabel) {
+					Tweener.addTween(prevLabel, {
+						x: toLeft ? -prevLabel.width : self.width,
+						time: 0.3,
+						transition: "easeInCubic",
+						onComplete: function():void {
+							removeChild(prevLabel);
+						}
+					});
+				}
+				//setTimeout(function():void {
+					label.x = toLeft ? width : -label.width;
+					addChild(label);
+					Tweener.addTween(currentLabel, {
+						x: (self.width - label.width)/2,
+						time: 0.3,
+						transition: "easeOutCubic"
+					});
+				//}, 1000);
+			}
+			
+			private function createLabel(str:String):Label {
+				var label:Label = new Label();
+				label.text = str;
+				label.width = 500;
+				
+				label.setStyle("color", 0xFFFFFF);
+				label.setStyle("fontSize", 20);
+				label.setStyle("fontWeight", "bold");
+				label.setStyle("textAlign", "center");
+				//label.setStyle("fontFamily", "sans-serif");
+				return label;
+			}
+		]]>
+	</mx:Script>
+</mx:Canvas>

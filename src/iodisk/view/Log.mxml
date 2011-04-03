@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml"
+	width="400"
+	height="300"
+	creationComplete="onCreationComplete()"
+	backgroundColor="#CCCCCC"
+	borderColor="#EEEEEE"
+	borderStyle="solid"
+	cornerRadius="5"
+	>
+	<mx:Script>
+		<![CDATA[
+			public static var _instances:Array = [];
+			private var maxLogLength:int = 1000;
+			
+			private function onCreationComplete():void {
+				_instances.push(this);
+				maxLogLengthTextInput.text = maxLogLength.toString();
+			}
+			
+			public static function debug(str:String):void {
+				trace(str);
+				for each (var instance:Log in Log._instances) {
+					instance.output(str);
+				}
+			}
+			
+			public function output(str:String):void {
+				if (logTextArea.text.length > maxLogLength) {
+					logTextArea.text = "";
+				}
+				if (logTextArea.text) {
+					str = "\n" + str;
+				}
+				logTextArea.text += str +" ";
+				setTimeout(onLogChange, 60);
+			}
+			
+			private function onLogChange():void {
+				logTextArea.verticalScrollPosition = logTextArea.textHeight / 12;
+			}
+		]]>
+	</mx:Script>
+	
+	<mx:VBox
+		paddingLeft="8"
+		paddingRight="8"
+		paddingTop="8"
+		paddingBottom="8"
+		width="100%"
+		height="100%"
+		>
+		<mx:TextArea
+			id="logTextArea"
+			text=""
+			width="100%"
+			height="100%"
+			/>
+		<mx:HBox>
+			<mx:Label text="Clear when the log is over" />
+			<mx:TextInput
+				id="maxLogLengthTextInput"
+				text=""
+				restrict="0-9"
+				width="50"
+				/>
+			<mx:Label text="characters." />
+		</mx:HBox>
+	</mx:VBox>
+</mx:Canvas>
